@@ -1,0 +1,228 @@
+---
+title: "Evaluation_techniques"
+output: html_document
+date: "2023-10-01"
+---
+#Installing packages
+```{r}
+#install.packages("dplyr")
+#install.packages("tidyverse")
+#install.packages("yarrr")
+
+library(dplyr)
+library(tidyverse)
+library(yarrr)
+
+#One goal that I have this semester is to be more confident in my R skills. 
+```
+
+#Getting Started with R
+```{r}
+getwd()
+setwd(dir = "/Users/oliviaenriquez/Desktop/Fall_23/Program_evaluation/")
+```
+
+```{r}
+data <- read.csv("faketucky.csv", na = "999")
+#data <- read_excel("my_file.xlsx")
+```
+
+```{r}
+head(pirates)
+#view(pirates)
+summary(pirates$tattoos)
+summarize
+
+```
+
+```{r}
+min(data$gpa)
+min(pirates$parrots)
+
+max(data$gpa)
+mean(pirates$parrots)
+
+unique(pirates$college)
+```
+
+```{r}
+aggregate(x = parrots ~ sex,
+          data = pirates,
+          FUN = mean)
+```
+
+How many school districts are in the data?
+Hint: use unique() and length() function
+
+What is the median GPA?
+Hint: make sure missing values are NA
+
+What percent of students had perfect attendance?
+Hint: use nrow(data[data$column == 0, ])
+
+Upload a screenshot of your code and output.
+
+```{r}
+length(unique(data$school_district))
+```
+
+```{r}
+summary(data$gpa)
+median(data$gpa, na.rm = TRUE)
+```
+
+```{r}
+summary(data$percent_absent)
+
+perfect_attendance <- nrow(data[data$percent_absent ==0, ])
+num_students<- length(data$percent_absent)
+
+(perfect_attendance-111)/num_students*100
+
+data$perfect_attendance[data$percent_absent == 0] <-1
+summary(data$perfect_attendance)
+table(data$perfect_attendance)
+
+```
+
+
+Answer the following questions using the faketucky.csv dataset.
+1. Change one variable to a factor.
+2. Conduct a t-test between the gpa of boys and girls. What is the mean of each group?
+3. Conduct a regression (linear model) with gpa as the x variable and male as the y variable. Is the result significant? How do you know? What are the limitations of this model?
+
+```{r}
+#is.factor(faketucky$male)
+#faketucky$male <- as.factor(faketucky$male)
+#is.factor(faketucky$male)
+#class(faketucky$male)
+```
+```{r}
+faketucky <- read.csv("faketucky.csv", na = "999") 
+summary(faketucky$gpa)
+```
+
+```{r}
+options(scipen=999)
+t.test(faketucky$gpa ~ faketucky$free_and_reduced_lunch)
+```
+
+#Bivariate and Multivariate Regressions
+```{r}
+model <- lm(faketucky$gpa ~ faketucky$free_and_reduced_lunch)
+
+model2 <- lm(faketucky$gpa ~ faketucky$free_and_reduced_lunch + faketucky$male + faketucky$race_ethnicity)
+
+summary(model)
+summary(model2)
+```
+
+##Stargazer model
+```{r}
+#install.packages("stargazer")
+library(stargazer)
+
+#as.factor(faketucky$race_ethnicity)
+stargazer(model, type="text", title="Regression Results", header=FALSE, keep.stat="n", single.row=TRUE, digits =2, out = "regression.results.doc")
+
+```
+
+
+#Difference in Difference, ggplot
+```{r}
+data <- data %>%
+  mutate(year = sample(2020:2021, nrow(data), replace = TRUE))
+```
+
+```{r}
+data$year <- factor(data$year, levels = c("2020", "2021"))
+levels(data$year)
+```
+
+
+```{r}
+data$treated <- ifelse(data$first_high_school_attended == "Jackson", 1, 0)
+```
+
+```{r}
+tapply(data$gpa, list(data$treated, data$year), mean, na.rm = TRUE)
+```
+
+```{r}
+school_gpa_model <- lm(data$gpa ~ data$treated * data$year)
+summary(school_gpa_model)
+```
+
+```{r}
+library(ggplot2)
+
+# Calculate the means by group and time variable
+plot_data <- aggregate(gpa ~ treated + year, data, mean)
+```
+
+```{r}
+# Create a DiD plot
+ggplot(plot_data, aes(x = as.numeric(year), y = gpa, color = factor(treated))) +
+  geom_line() +                           # Line plot for each group
+  geom_smooth(method = "lm", se = FALSE) + # Add regression lines
+  labs(title = "Difference-in-Differences Plot",
+       x = "Year",
+       y = "GPA") +
+  scale_color_manual(values = c("lightblue", "pink"), 
+                     labels = c("Non-Program Participants", "Program Participants")) +
+  scale_x_discrete(limits = c("Pre-program", "Post-program")) +
+  theme_minimal()
+
+```
+
+#Random Assignment
+```{r}
+library(dplyr)
+
+data <- data %>%
+  filter(grepl("Jackson|Wallaby", first_high_school_attended))
+
+table(data$first_high_school_attended)
+
+data$participants <- ifelse(data$first_high_school_attended == "Jackson", 1, 0)
+data$participants <- as.factor(data$participants)
+```
+#Propensity Score Matching
+```{r}
+library(MatchIt)
+
+data <- data[!is.na(data$gpa), ]
+data <- data[!is.na(data$free_and_reduced_lunch), ]
+
+m.nn <- matchit(participants ~ male + race_ethnicity + free_and_reduced_lunch + percent_absent + gpa,  data = data, method = "nearest", ratio = 1)
+
+summary(m.nn)
+
+plot(m.nn, type = "jitter")
+plot(m.nn, type = "hist")
+```
+
+
+```{r}
+data_matched<-match.data(m.nn)
+```
+
+```{r}
+model <- lm(received_high_school_diploma ~ participants, data = data_matched)
+summary(model)
+```
+
+```{r}
+model2 <- lm(gpa ~ participants, data = data_matched)
+summary(model2)
+```
+
+
+
+
+
+
+
+
+
+
